@@ -1,0 +1,236 @@
+---
+title: "Gapminder"
+author: "C'Asha Faltz"
+date: "3/21/2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	comment = NULL
+)
+```
+
+```{r}
+if(!file.exists("./data")) {dir.create("./data")}
+library(readxl)
+library(tidyr)
+library(magrittr)
+library(tidyverse)
+library(readr)
+library(gapminder)
+library(dplyr)
+library(countrycode)
+library(plotly)
+```
+
+```{r}
+fileUrls <- c("https://docs.google.com/spreadsheet/pub?key=0AkBd6lyS3EmpdHo5S0J6ekhVOF9QaVhod05QSGV4T3c&output=csv",
+             "https://docs.google.com/spreadsheet/pub?key=phAwcNAVuyj2tPLxKvvnNPA&output=csv", 
+             "https://docs.google.com/spreadsheet/pub?key=tSUr_yZVbM6a3AGJEq_Z2Pw&output=csv",        
+             "https://docs.google.com/spreadsheet/pub?key=0ArfEDsV3bBwCdHBzUVVSMDlTX1ZCUnNJQ3ZFdkFXVFE&output=csv",
+             "https://docs.google.com/spreadsheet/pub?key=phAwcNAVuyj0XOoBL_n5tAQ&output=csv") 
+
+
+var_names <- c("GDP","life_expectancy", "alt_GDP", "blood press", "population")
+head(fileUrls)
+```
+
+```{r}
+#got help from Rabya
+get_clean <- function(url_in, var_names){
+     df_files <- read_csv(url_in)
+     names(df_files)[1] = "country"
+     df_pivot <- df_files %>% pivot_longer(cols = -c("country"), names_to = 'year', values_to = var_names, values_drop_na = T)
+}
+out1 <- get_clean(fileUrls[1],var_names[1])
+head(out1)
+```
+
+```{r}
+library(purrr)
+all_data <- map2(fileUrls,var_names, get_clean)
+head(all_data)
+```
+
+```{r}
+join_data <- Reduce(left_join, all_data)
+all_dataframe <- tbl_df(join_data) 
+all_dataframe
+
+``` 
+
+```{r}
+country_org <- all_dataframe[[1]]
+all_dataframe <- all_dataframe %>% mutate(continent = countrycode(country_org, "country.name", "continent")) %>% select(continent, everything())
+all_dataframe
+```
+
+
+```{r}
+no_cont <- all_dataframe %>%
+  filter(is.na(continent))
+no_cont <- unique(no_cont$country)
+no_cont
+
+```
+
+
+```{r}
+#help from Erin
+new_gapminder <- all_dataframe %>% 
+  mutate(continent = continent) %>% 
+  mutate(continent = case_when(
+                              country ==  "Akrotiri and Dhekelia" ~ "Europe",
+                              country ==  "Central African Rep." ~ "Africa",
+                              country ==  "Channel Islands"   ~ "Europe",
+                              country ==  "Cocos Island" ~ "Asia",
+                              country ==  "Czechoslovakia" ~ "Europe",
+                              country ==  "East Germany"  ~ "Europe",
+                              country ==  "Eritrea and Ethiopia" ~ "Africa",
+                              country ==  "Kosovo" ~ "Europe",
+                              country ==  "North Yemen (former)" ~ "Asia",
+                              country ==  "Serbia and Montenegro" ~ "Europe",
+                              country ==  "South Yemen (former)" ~ "Asia",
+                              country ==  "St. Martin" ~ "Americas",
+                              country ==  "Yugoslavia"  ~ "Europe",
+                              TRUE ~ continent
+                                     )) %>% 
+                          select(continent, country, year, everything()) %>% 
+                          arrange(continent, country, year)
+tbl_df(new_gapminder)
+
+```
+
+
+```{r}
+library(ggplot2)
+library(gganimate)
+plot_data <- new_gapminder %>% select(country, continent, year, GDP, life_expectancy, population)
+plot_data <- plot_data  %>% fill(population) %>% filter(GDP > 0)
+plot_data
+```
+
+```{r}
+#help from Rabya
+plot_data$year = as.integer(plot_data$year)
+
+p <- new_gapminder %>%
+  plot_ly(
+    x = ~GDP, 
+    y = ~life_expectancy, 
+    size = ~population, 
+    color = ~continent, 
+    frame = ~year, 
+    text = ~country, 
+    hoverinfo = "text",
+    type = 'scatter',
+    mode = 'markers'
+  ) %>%
+  layout(
+    xaxis = list(
+      type = "log"
+    )
+  )
+
+p
+```
+
+```{r}
+by_country <- plot_data %>% group_by(country) %>% nest()
+by_country
+```
+
+```{r}
+country_model <- function(df){
+  lm(life_expectancy ~ GDP, data = df)
+}
+by_county1 <- plot_data %>% na.omit() %>% group_by(country) %>% nest()
+by_country <- by_county1 %>% mutate(model = map(data, country_model))
+
+by_country
+```
+
+```{r}
+library(modelr)
+by_country <- by_country %>% 
+  mutate(resids = map2(data, model, add_residuals))
+by_country
+```
+
+```{r}
+resids <- unnest(by_country, resids)
+resids
+```
+
+```{r}
+resids %>% 
+  ggplot(aes(year, resid, group = country)) +
+    geom_line(alpha = 1 / 3) + 
+    facet_wrap(~continent)
+```
+
+```{r}
+#Used textbook
+library(broom)
+by_country <- gapminder %>%
+  group_by(country, continent) %>%
+  nest() 
+country_model <- function(df) {
+  lm(lifeExp ~ year, data = df)
+}
+by_country <- by_country %>% 
+  mutate(model = map(data, country_model))
+by_country
+
+glance <- by_country %>%
+  mutate(glance = map(model, broom::glance)) %>%
+  unnest(glance, .drop = TRUE)
+
+mod_test <- filter(glance, r.squared < 0.25)
+
+gapminder %>% 
+  semi_join(mod_test, by = "country") %>% 
+  ggplot(aes(year, lifeExp, colour = country)) +
+    geom_line()
+
+```
+R-squared is the percentage of the dependent variable variation that a linear model explains. 0% represents a model that does not explain any of the variation in the response variable around its mean. The above countries all have r.squared less than 0.25, indiciating a lot of unexplained variation, thus a poor model fit. 
+```{r,3}
+
+quadratic_mod <- function(df){
+  lm(data = df, lifeExp ~ year + poly(year,2))
+}
+quad <- gapminder %>% 
+  mutate(year = year - mean(year)) %>%
+  group_by(country)%>%
+  nest() %>%
+  mutate(model = map(data, quadratic_mod))
+quad
+
+quad <- quad %>%mutate(resids = map2(data, model, add_residuals))
+unnest(quad,resids)
+
+```
+
+```{r}
+BG <- quad$model[quad$country == "Belgium"]
+BG
+```
+The interpretation of the coeffiecients of belgiium are such that: Y = 73.64 + 0.21X + .44X^2. The coeffienct for poly(year,2)1 returns NA because that variable is linearly correlated to another variable in the model. 
+
+
+```{r}
+glance2 <- glance  %>% filter(r.squared < 0.25) %>%mutate(resids = map2(data, model, add_residuals))
+#glance2
+unnest(glance2, resids) %>%  ggplot(aes(year, resid, color = country)) +
+    geom_line(alpha = 1 / 3) 
+```
