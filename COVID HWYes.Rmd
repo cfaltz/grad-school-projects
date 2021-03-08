@@ -1,0 +1,392 @@
+---
+title: "COVID HW"
+author: "C'Asha Faltz"
+date: "4/6/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(countrycode)
+theme_set(theme_bw())
+
+dat <-
+  read_csv("https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv")
+
+total_by_state <- dat %>%
+  group_by(state,date) %>%
+  summarize(total_deaths = sum(deaths), total_cases = sum(cases)) %>% 
+  arrange(desc(total_deaths))
+
+
+```
+
+```{r}
+dat_small <-
+  dat %>%
+  filter(state %in% c("South Carolina", "Connecticut")) %>%
+  mutate(county = factor(county))
+
+dat_small %>%
+  filter(state == "Connecticut") %>%
+  ggplot(aes(x = date, y = cases, group = county, col = county)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ state) +
+  scale_y_log10() +
+  scale_color_brewer(palette = "Set1")
+
+```
+
+
+```{r}
+deaths_dmv <- dat %>% filter(state %in% c("Virginia", "Maryland", "District of Columbia")) %>% 
+  group_by(state) %>%
+  summarize(total_deaths = max(deaths)) %>% 
+  arrange(desc(total_deaths))
+
+
+cases_dmv <- dat %>% filter(state %in% c("Virginia", "Maryland", "District of Columbia")) %>% 
+  group_by(state) %>%
+  summarize(total_cases= max(cases)) %>% 
+  arrange(desc(total_cases))
+
+inner_join(deaths_dmv, cases_dmv)
+```
+
+```{r}
+library(ggplot2)
+dat_small <-
+  dat %>%
+  filter(state %in% c("Virginia", "Maryland", "District of Columbia")) %>%
+  mutate(county = factor(county))
+
+dat_small %>% filter(county %in% c("District of Columbia", "Alexandria city","Fairfax","Loudoun", "Prince William","Montgomery", "Prince George's",
+                                   "Anne Arundel", "Charles", "Howard", "Frederick")) %>% 
+                        ggplot(aes(x = date, y = cases, group = county, col = county)) +
+                   geom_line() +
+                    geom_point() +
+                      facet_wrap(~ state) +
+                        scale_y_log10() +
+                          scale_color_brewer(palette = "Set1") +  theme(legend.position="bottom")
+  
+```
+
+```{r}
+
+dmv <- dat_small%>%
+  filter(state %in% c("Virginia", "Maryland", "District of Columbia"))
+dmv_summary <- dmv %>% filter(county %in% c("District of Columbia", "Alexandria city","Fairfax","Loudoun", "Prince William","Montgomery", "Prince George's","Anne Arundel", "Charles", "Howard", "Frederick")) %>% group_by(date) %>% 
+   summarise(total_cases = sum(cases) , total_deaths = sum(deaths)) 
+dmv_summary %>% ggplot(aes(x = date, y = total_cases)) + geom_point() + geom_line() + labs(x="", y ="Total Cases", title = "Total Confirmed Cases in DMV")
+dmv_summary %>% ggplot(aes(x = date, y = total_deaths)) + geom_point() + geom_line() + labs(x="", y ="Total Deaths", title = "Total Confirmed Deaths in DMV")
+#plot death and cases together
+dmv_summary %>% ggplot(aes(x = date)) + 
+  geom_point(aes(y = total_deaths)) + geom_line(aes(y = total_deaths),col = "yellow") +
+  geom_point(aes(y = total_cases)) + geom_line(aes(y = total_cases),col = "blue") +  scale_y_log10() +
+  labs(x="", y ="Log of Total Cases & Total Deaths", title = "Log of Total Confirmed Cases & Deaths in DMV")
+
+```
+
+```{r}
+covid_countries <- read_csv('https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/archived_data/archived_time_series/time_series_19-covid-Confirmed_archived_0325.csv' )
+covid_countries
+```
+
+```{r} 
+
+covid_countries <- covid_countries %>% unite(`Country/State`, `Country/Region`,`Province/State`, remove = F, sep = " ", na.rm = T) %>% dplyr::select(`Country/State`,everything())
+covid_countries
+```
+
+```{r}
+
+covid_countries <- covid_countries %>% group_by(`Country/State`) %>% gather(key = Date, value = Cases, c(6:67)) 
+covid_countries %>% arrange(`Country/State`)
+```
+
+```{r}
+
+is.dbl <- sapply(covid_countries, is.double)
+covid_countries[is.dbl] <- lapply(covid_countries[is.dbl], round, 0)
+covid_dates <- covid_countries %>% group_by(`Country/State`) %>% mutate(Date = mdy(Date)) 
+```
+
+```{r}
+
+covid_countries <- covid_dates %>% mutate(Continent = countrycode(`Country/Region`, "country.name", "continent"))
+```
+
+```{r}
+covid_countries1 <- covid_countries %>% 
+  mutate(Continent = Continent) %>% 
+  mutate(Continent = case_when(
+                              `Country/Region` ==  "Kosovo" ~ "Europe",
+                              `Country/Region` == "Cruise Ship" ~ "Asia",
+                              TRUE ~ Continent)) %>% group_by(`Country/State`) %>% arrange(Date)
+covid_countries1 %>% arrange(`Country/State`)
+
+```
+
+```{r}
+covid_count <- covid_countries1  %>% group_by(`Country/State`, `Country/Region`, Continent) %>% 
+  summarise(total_cases = sum(Cases)) %>% 
+  arrange(desc(total_cases)) 
+covid_count 
+```
+
+```{r}
+covid_tally <- ungroup(covid_count, total_cases)
+covid_tally <- covid_tally[1:25,]
+
+covid_graph <- covid_countries1 %>% filter(`Country/State` %in% covid_tally[[1]]) 
+covid_graph %>% arrange(`Country/State`, Date)
+```
+
+```{r}
+covid_graph %>% group_by(`Country/State`) %>% ggplot(aes(x = Date, y = Cases, col = `Country/State`)) +
+ geom_line() +
+  scale_y_log10() +
+  facet_wrap(~Continent, scales = "free_y") +
+  labs(x="Date", y ="Confirmed Cases") +
+  theme(legend.position="bottom")
+
+
+```
+```{r}
+covid_ny <- covid_countries %>% filter(`Province/State` == "New York") %>% 
+  group_by(Date) %>% summarise(Confirmed_Cases = sum(Cases))
+
+dat_ny <- dat %>% filter(`state` == "New York") %>% 
+  group_by(Date = date) %>% summarise(n = sum(cases))
+
+new_ny <- full_join(covid_ny, dat_ny, by = 'Date')
+ny_compare <- new_ny[40:76,]
+ny_compare[ny_compare == 0 ] <- NA
+
+ny_compare
+```
+
+```{r}
+ny_compare %>% ggplot()  + 
+  geom_point(aes(x = Date, y = Confirmed_Cases), col = "blue", shape = "square") + geom_line(aes(x = Date, y = n), col = "red") + scale_y_log10() 
+```
+
+```{r}
+Slowed_cases <- covid_countries1 %>% 
+  filter(`Country/State` %in% c("China Guangdong", "China Henan", "China Hubei","China Zhejiang", "Cruise Ship Diamond Princess" )) 
+
+Slowed_cases %>% ggplot(aes(x = Date, y = Cases)) +
+    geom_point() +
+  facet_wrap(~ `Country/State`, scales = "free")
+
+```
+
+```{r}
+hubei_covid <- covid_countries %>% filter(`Country/State` %in% "China Hubei" )
+hubei_covid %>% ggplot(aes(x = Date, y = Cases)) + geom_point()
+```
+
+```{r}
+sigmoid <- function(x, params){
+  params[1] / (1 +exp(-params[2] * (x - params[3])))
+}
+
+hubei_covid$Date_num <- as.numeric(hubei_covid$Date)
+
+fit_hubei_covid <- nls(Cases ~ K / (1 + exp(-B * (Date_num - t0))), data = hubei_covid, start = list(K = 60000, B = 0.5, t0 = 18300))
+
+params <- coef(fit_hubei_covid)
+
+hubei_covid <- hubei_covid %>% mutate(Pred = sigmoid(Date_num, params)) %>% select(Cases, Pred, Date, Date_num, everything())
+
+hubei_covid %>% ggplot(aes(x = Date, y = Cases)) +
+  geom_line(aes(x = Date, y = Pred)) +
+  geom_point()
+```
+
+```{r}
+summary(fit_hubei_covid)
+broom::glance(fit_hubei_covid)
+```
+
+```{r}
+sigmoid2 <- function(x, params){
+  params[1] / (1 +exp(-params[2] * (x - params[3]))) ^ (1 / params[4])
+}
+
+hubei_covid$Date_num <- as.numeric(hubei_covid$Date)
+
+fit_hubei_covid2 <- nls(Cases ~ K / (1 + exp(-B * (Date_num - t0))) ^ (1 / v), data = hubei_covid, start = list(K = 60000, B = 0.5, t0 = 18300, v = 0.5))
+
+params <- coef(fit_hubei_covid2)
+
+hubei_covid <- hubei_covid %>% mutate(Pred_v = sigmoid2(Date_num, params)) %>% select(Cases, Pred_v, Date, Date_num, everything())
+
+hubei_covid %>% ggplot(aes(x = Date, y = Cases)) +
+  geom_line(aes(x = Date, y = Pred_v), col = "red") +
+    geom_line(aes(x = Date, y = Pred), col = "black") +
+  geom_point()
+```
+
+```{r}
+new_data <- covid_countries1 %>%  filter(`Country/State` %in% c("China Guangdong", "China Henan", "China Hubei","China Zhejiang", "Cruise Ship Diamond Princess" )) 
+new_data
+
+new_data1 <- new_data %>% group_by(`Country/State`, `Province/State`, `Country/Region`,   Lat,  Long, Continent ) %>% nest()
+
+
+```
+
+```{r}
+new_data$Date_num <- as.numeric(new_data$Date)
+
+sigmoid2 <- function(x, params){
+  params[1] / (1 +exp(-params[2] * (x - params[3]))) ^ (1 / params[4])
+}
+fit_covid2 <- nls(Cases ~ K / (1 + exp(-B * (Date_num - t0))) ^ (1 / v), data = new_data, start = list(K = 1.441773e+04, B = 2.612391e-01, t0 = 1.830329e+04, v = 1.367535e+00 ))
+
+params2 <- coef(fit_covid2)
+params2
+
+
+```
+
+```{r version1, eval=FALSE, include=FALSE}
+# convert to date_num
+new_data$Date_num <- as.numeric(new_data$Date)
+
+table(new_data$Date_num)
+
+# function covid_model
+# covid_model <- function(Date_num, param, dataset){
+#   nls(Cases ~ K / (1 + exp(-B * (Date_num - t0))) ^ (1 / v), 
+#       data = dataset,
+#       start = list(K = 1.441773e+04, B = 2.612391e-01, t0 = 1.830329e+04, v = 1.367535e+00 ))
+# }
+
+# FUNCTION covid_model
+
+covid_model <- function(dataset){
+  nls(data = dataset, Cases ~ K / (1 + exp(-B * (Date_num - t0))) ^ (1 / v), 
+      start = list(K = 1.441773e+04, B = 2.612391e-01, t0 = 1.830329e+04, v = 1.367535e+00 ))
+}
+
+library(minpack.lm)
+####### TESTING ####### 
+new_data_1 = new_data %>% filter(`Country/State` == "China Guangdong")
+new_data_2 = new_data %>% filter(`Country/State` == "China Hubei")
+new_data_3 = new_data %>% filter(`Country/State` == "China Henan")
+new_data_4 = new_data %>% filter(`Country/State` == "China Zhejiang")  # ?error
+new_data_5 = new_data %>% filter(`Country/State` == "Cruise Ship Diamond Princess")
+
+
+#nls(data = new_data_4,log(Cases) ~ log(f(Date_num,a,b)), start = c(a = 1, b = 1))
+
+# apply to get coef
+fit_covid1 <- nls(data = new_data_4, Cases ~ K / (1 + exp(-B * (Date_num - t0))) ^ (1 / v), 
+                   start = list(K = 1.300e+03, B = 2.0e-01, t0 = 1.83e+04, v = 1.338e-02))
+
+new_data_4 %>% ggplot(aes(Date_num, Cases)) + geom_point()
+
+broom::tidy(fit_covid1)
+
+model1  = covid_model(new_data_4)
+broom::tidy(model1)
+
+
+fit_covid2 <- nls(data = new_data_1,Cases ~ K / (1 + exp(-B * (Date_num - t0))) ^ (1 / v), 
+                  start = list(K = 1.441773e+04, B = 2.612391e-01, t0 = 1.830329e+04, v = 1.367535e+00 ))
+
+# obtain the parameter
+
+params1 <- coef(fit_covid1)
+params1
+
+params1_1 <- coef(fit_covid1_1)
+params1_1
+
+
+
+params2 <- coef(fit_covid2)
+params2
+########  END TESTING ####### 
+
+# nest data
+new_data_nested = new_data %>% 
+  group_by(`Province/State`, Lat, Long, `Country/State`, `Country/Region`, Continent) %>% filter(!`Country/State` == "China Zhejiang") %>% 
+  select(Cases , Date_num) %>%
+  nest(Cases, Date_num)
+
+# apply function to 4 countries
+new_data_nested = new_data_nested %>% 
+  mutate(model = purrr::map(.x = data,  covid_model))
+
+# get coef dataframe
+model_coefs_df = new_data_nested %>% 
+  mutate(model_coef = purrr::map(.x = model, .f = broom::tidy)) %>% 
+  unnest(model_coef)
+
+
+```
+
+```{r}
+new_data$Date_num <- as.numeric(new_data$Date)
+
+
+# FUNCTION covid_model
+covid_model <- function(df){
+  startK <- max(df$Cases)
+  nls(Cases ~ K /( (1 +  exp(-B * (Date_num - t0))) ) ^(1/v) , 
+                data = df,
+                start = list(K = startK,  B = .25, t0 = 18300, v = 1),
+                control = list(maxiter = 1000, warnOnly = TRUE))
+}
+
+new_data_nested = new_data %>% group_by(`Country/State`, Lat, Long) %>% select(Cases , Date_num) %>%
+  nest()
+
+# apply function to 4 countries
+new_data_nested = new_data_nested %>% 
+  mutate(model = purrr::map(.x = data,  covid_model))
+
+# get coef dataframe
+model_coefs_df = new_data_nested %>% 
+  mutate(model_coef = purrr::map(.x = model, .f = broom::tidy)) %>%
+  unnest(model_coef)
+
+model_coefs_df1 <- model_coefs_df%>% select(-data, - model) %>%
+  pivot_wider(names_from = term, values_from = c(estimate , std.error, statistic, p.value), names_prefix = "")
+
+
+model_names <- model_coefs_df1[,1:7]
+
+colnames(model_names) <- c("Country/State", "Lat", "Long", "K", "B", "t0", "v")
+
+
+test <- trunc(model_names$t0)
+t <- map(test, ~as.Date(.,  "1970-01-01")) #use this to get list of correspondind dates. 
+model_names$t0_date <- as.Date(c("2020-02-11", "2020-01-26", "2020-01-31", "2019-12-29","2020-02-18" ))
+
+
+```
+```{r}
+date_func <- function(t){
+new_data$Date[new_data$Date_num == t]
+}
+date_func <- function(t){
+as.Date(t, origin = "1970-01-01")
+}
+as.Date(test, origin = "1970-01-01")
+
+
+
+date_func(test)
+```
