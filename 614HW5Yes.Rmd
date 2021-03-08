@@ -1,0 +1,135 @@
+---
+title: "614 HW 5"
+author: "C'Asha Faltz"
+date: "9/30/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#My coded confidence intervals are symmetric to my t test intervals and I can't figure out why. 
+
+1.1
+```{r}
+library(ggplot2)
+library(Sleuth3)
+timedat <- data.frame(Time = c(5.79, 1579.52, 2323.70, 68.8, 108.29, 110.29, 426.07, 1067.60),
+                      kV = factor(c(rep(26, 3), rep(28, 5))))
+timedat$logTime <- log(timedat$Time)
+timedat
+```
+1.2
+```{r}
+agg.timedat <- aggregate(timedat$Time, by = list(timedat$kV), mean)
+names(agg.timedat) <- c("kV Group", "Mean Break Time")
+agg.timedat
+```
+1.3
+```{r}
+agg.timedat <- aggregate(timedat$logTime, by = list(timedat$kV), mean)
+names(agg.timedat) <- c("kV Group", "Mean Log Break Time")
+agg.timedat
+```
+1.4
+```{r}
+vec26 <- timedat$logTime[timedat$kV == 26]
+vec28 <- timedat$logTime[timedat$kV == 28]                   
+z.one<- mean(vec26)
+z.two <- mean(vec28)
+diff.z <- (z.two - z.one)
+diff.z
+```
+1.5
+```{r}
+exp(z.two - z.one)
+```
+The antilogarithm of the mean difference of the log transformed vectors is the median brain size on the original, nontransformed, brain size data.
+
+1.6
+```{r}
+sdx <- sd(vec26)
+sdy <- sd(vec28)
+sumX <- sum(timedat$kV == "26")
+sumY <- sum(timedat$kV == "28")
+sp <- sqrt((((sumX - 1)*(sdx^2)) + ((sumY -1)*(sdy^2))) / (sumX + sumY -2))
+SE <- sp * sqrt((1/sumX)+(1/sumY))
+df <- sumX + sumY -2
+tratio <- qt(0.975, df, lower.tail = T )
+half.width <- SE*tratio
+lower <- diff.z - half.width
+upper <- diff.z + half.width
+lower
+upper
+exp(lower)
+exp(upper)
+```
+
+1.7
+```{r}
+so_tired <- t.test(vec26,vec28, var.equal = T) 
+so_tired
+exp(so_tired$conf.int)
+```
+1.8 
+```{r}
+timedat <- data.frame(Time = 1:6, kV = factor(c(26, 28, 26, 26, 28, 28)))
+timedat$logTime <- log(timedat$Time)
+vec26 <- timedat$logTime[timedat$kV == 26]
+vec28 <- timedat$logTime[timedat$kV == 28]   
+z.one <- mean(vec26)
+z.two <- mean(vec28)
+diff.z <- (z.two - z.one)
+sdx <- sd(vec26)
+sdy <- sd(vec28)
+sumX <- sum(timedat$kV == "26")
+sumY <- sum(timedat$kV == "28")
+sp <- sqrt((((sumX - 1)*(sdx^2)) + ((sumY -1)*(sdy^2))) / (sumX + sumY -2))
+SE <- sp * sqrt((1/sumX)+(1/sumY))
+df <- sumX + sumY -2
+tratio <- qt(0.975, df, lower.tail = F )
+half.width <- SE*tratio
+lower <- diff.z - half.width
+upper <- diff.z + half.width
+lower
+upper
+exp(lower)
+exp(upper)
+so_tired <- t.test(vec26,vec28, var.equal = T)
+so_tired
+exp(so_tired$conf.int)
+```
+
+1.9. The answer is symmetric, that is the lower and upper confidence intervals have swapped in value and each value now has the opposite sign. If you have values on a number line, in our case the lower and upper limits, and you fold the number line along x = 0, the values will switch quadrants and their signs will change. The antilog is different because the signs on the intervals are different. 
+```{r}
+timedat <- data.frame(Time = c(5.79, 1579.52, 2323.70, 68.8, 108.29, 110.29, 426.07, 1067.60),
+                      kV = factor(c(rep(26, 3), rep(28, 5))))
+timedat$logTime <- log(timedat$Time)
+
+vec26 <- timedat$logTime[timedat$kV == 26]
+vec28 <- timedat$logTime[timedat$kV == 28]                   
+so_tired <- t.test(vec28,vec26, var.equal = T) 
+so_tired
+exp(so_tired$conf.int)
+```
+
+```{r}
+qplot(sample = ex0333$BrainSize, geom = 'qq') +
+      geom_qq_line() #points concentrated above the qqline are evidence of a right skew, the normaility assumption fails. 
+ex0333$logSize <- log(ex0333$BrainSize)
+qplot(ex0333$LitterSize, ex0333$BrainSize, geom = 'boxplot') 
+head(ex0333)
+small.vec <- ex0333$logSize[ex0333$LitterSize == "Small"]
+large.vec <- ex0333$logSize[ex0333$LitterSize == "Large"]
+t.test(small.vec,large.vec, var.equal = T)
+diff <- exp(mean(large.vec) - mean(small.vec))
+back <- t.test(small.vec, large.vec, var.equal = T)
+diff
+exp(back$conf.int)
+```
+
+Checking for t assumptions using a qqplot and qqline, we see that the points of the the brain sizes are concentrated above the qqline, meaning the data is skewed right. Additonally, we see from our boxplots that the largest group bserved, large litter sizes, also has the largest variance. Both observations provide evidence that the validity of t tools will produce misleading results. The conditions are not met for usuage of t tools. It then becomes necessary to use an alternative for the data using a logarthmic transformation. Logarithemic transformation is chosen because the original data are all positive. We are then able to perform the usual t test for the hypothesis equals zero, but now we will test it on the log transformed data. The statistical model for this dataset would be Y2 = Y1 + delta, where Y2 would represent the mean of the log of large litter brain sizes and Y1 would represnt the mean of the log of small litter brain sizes and delta would equal 0. To determine if there is a difference between brain sizes between small and large litters requires a null hypothesis which states there is no difference between the mean log brain size of small and large litters,that is Ho: mean(log(Y1)) = mean(log(Y2). The alternative hypothesis, then, must assert that there is a difference between the mean log of brain sizes of small and large litter sizes, or Ha: mean(log(Y1)) != mean(log(Y2). Based on the logic presented in the statistical model we can develop our interpretable and testable hypotheses Ho = small litter producing mammal's brain sizes are equal to the large litter producing mammal's brain sizes. 
+              
+From our sample, we can gather estimates of the effect of litter producution on brain size by subtracting the mean log brain sizes for small litter producing mammals from the mean log brain size of large litter producing mammals. From our subject we see the following effect sizes on brain size: brain size of large litter producing mammals is 1.48 times larger than that of small litter producing mammals. A 95% confidence interval for this ranges between  -0.7960 and 0.00211. If we are interested in untransforming the confidence interval, we take the antilog of the aforementioned confidence interval by euler's number: e^-0.7960 and e^0.0021 produces our 95 % confidence interval for the original data 0.451 to 1.00. 
+
+We can say with that it is suggestive that a 95% confidence interval for this multipicative effect is 0.451 times to 1.00 times. The result of our pvalue is suggestive but inconclusive since it is marginally above our 0.05 threshold (p = 0.0512), we will neither reject nor fail to reject the null hypothesis and caveat by saying it is suggestive that there exists a difference in brain sizes of mammals who produce small and large litters. There is a suggestive significant relationship between litter size and brain size. We use a two-sample t.test to see if the difference between two groups can be explained by chance. This is an observational study so no causal relationship can be determined. 

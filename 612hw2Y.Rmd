@@ -1,0 +1,114 @@
+  ---
+title: "612 Hw 2"
+author: "C'Asha"
+date: "9/14/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+In the data set morley found in the datasets package:
+
+a) Find the mean speed of light taken over all experiments and runs.
+
+```{r}
+ mean(morley$Speed)
+```
+b) Using the function aggregate, find the mean speed for each experiment.
+```{r}
+ df <- aggregate(morley$Speed, by = list(Ex.Groups = morley$Expt), mean)
+names(df) <- c("Experiment Group", "Speed")
+df
+morley
+small.mean <- mean(small.vec)
+large.mean <- mean(large.vec)
+tstat <- large.mean - small.mean
+sd.small <- sd(small.vec)
+sd.large <- sd(large.vec)
+sum.small <- sum(small.vec)
+sum.large <- sum(large.vec)
+sp <- sqrt((((sum.small - 1)*(sd.small^2)) + ((sum.large -1)*(sd.large^2))) / (sum.small + sum.large -2))
+SE <- sp * sqrt((1/sum.small)+(1/sum.large))
+df <- sum.small + sum.large -2
+tratio <- qt(0.975, df, lower.tail = T )
+half.width <- SE*tratio
+lower <- tstat - half.width
+upper <- tstat + half.width
+lower
+upper
+```
+c) Using lm and summary.lm, do a linear regression analysis with speed as the response variable and run as the control variable. Do this over all experiments. Is the slope of the regression line significant? 
+  The slope of the regerssion is not significant, we know this because our p value is greater than 0.05 
+```{r}
+lr <- lm(Speed ~  Run, data = morley)
+summary.lm(lr)
+```
+d) Do a linear regression analysis for each set of experiments separately. Comment on this referring to the previous problem.
+  Experiments 1,3,4, and 5 all have non-significant p values greater that 0.05 while experiment 2 has a              significant p value of 4.31e-05. For each experiement 1,3, 4, and 5, we fail to reject the null hypothesis for     experiment to we reject the null hypothesis. It would then make sense that if 4/5 of the experiements group have   largely non-significant p values, that the experiements overall would reflect a non-significant relationship       between the response and control variable. 
+  
+```{r}
+ex1 <- subset(morley, morley$Expt == 1,) 
+  lr.ex1 <- lm(Speed ~ Run, ex1)
+    summary.lm(lr.ex1)
+ex2 <- subset(morley, morley$Expt == 2,)
+  lr.ex2 <- lm(Speed ~ Run, ex2)
+    summary.lm(lr.ex2)
+ex3 <- subset(morley, morley$Expt == 3,)
+  lr.ex3 <- lm(Speed ~ Run, ex3)
+    summary.lm(lr.ex3)
+ex4 <- subset(morley, morley$Expt == 4,)
+  lr.ex4 <- lm(Speed ~ Run, ex4)
+    summary.lm(lr.ex4)
+ex5 <- subset(morley, morley$Expt == 5,)
+  lr.ex5 <- lm(Speed ~ Run, ex5)
+    summary.lm(lr.ex5)
+```
+2. Use the data set USArrests for the following problems:
+
+a) Create matrix consisting of the correlation coefficients of each of the pairs in
+Murder, Assault, and Rape.
+Hint: To get the data frame without UrbanPop, use
+      subset(USArrests,select = -UrbanPop)
+```{r}
+Arrests <- subset(USArrests,select = -UrbanPop)
+am <- Arrests$Murder
+aa <- Arrests$Assault
+ar <- Arrests$Rape
+
+mtx <- matrix(c(cor(am,ar),cor(am,aa), cor(aa,ar)))
+  mtx
+```
+
+b) The method quantile is used to find the quantiles of a numerical data set. For example, if we want the 25th, 50th, the 75th percentile of USArrests$UrbanPop, 
+***Add pop cat in the example above to the data frame USArrests.
+***Use aggregate to find the mean of the variables over each urban population category.
+```{r}
+qu <- quantile(USArrests$UrbanPop,seq(.25,.75,.25))
+pop.cat <- findInterval(USArrests$UrbanPop, qu)
+pop.cat <- factor(pop.cat)
+data.frame(USArrests, pop.cat)
+pop.cat <- factor(pop.cat)
+aggregate(USArrests, by = list(pop.cat), mean)
+```
+
+
+3. For this problem, you need to have the R package reshape2 installed. If you haven’t already done so, please install this package from an R session via:
+```{r}
+library(reshape2)
+```
+
+a) “Melt” the array Titanic into a data frame using the function melt from the
+reshape2 package.
+```{r}
+titan <- melt(Titanic)
+titan
+```
+      
+b) Use aggregate to present the numbers in each category defined by the variables Class and Survived.
+```{r}
+df2 <- aggregate(titan$value, by = list(Class = titan$Class, Survival = titan$Survived), sum)
+names(df2) <- c("Class", "Survival", "Values")
+df2
+```

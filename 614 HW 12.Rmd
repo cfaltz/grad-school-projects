@@ -1,0 +1,188 @@
+---
+title: "HW 614 Week 12"
+author: "C'Asha Faltz"
+date: "11/24/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = F}
+library(tidyverse)
+library(broom)
+library(ggplot2)
+library(Sleuth3)
+library(GGally)
+```
+
+```{r}
+data(ex0923)
+ex0923$Gender <- factor(ex0923$Gender, levels = c("female", "male"))
+head(ex0923)
+```
+1.3
+
+```{r}
+ggpairs(ex0923, columns = 3:5)
+```
+```{r, message = F}
+ex0923$log.income2005 <- log(ex0923$Income2005) #because there is a left skew of the data.  
+qplot(AFQT, log.income2005, data = ex0923, color = Gender) + geom_smooth(color = 'yellow', se = F) #qplot of first gragh in ggpairs
+qplot(Educ, log.income2005, data = ex0923, color = Gender) + geom_smooth(color = 'yellow', se = F) # qplot of second grapgh
+qplot(AFQT, Educ, data = ex0923, color = Gender) + geom_smooth(color = 'yellow', se = F)
+```
+There appears to be a linear relationship between AFQT with Income2005 as well as with Educ. A difference in income by gender is seen. 
+
+1.4 
+log(Yi) = beta0 + beta1X1i + beta2X2i + beta3X3i + epsiloni
+
+where log(Yi) = the log transformation of the Income 2005 values, beta0 = the intercept of log(Yi), beta0 is the value of log(yi) when X2, X2 & X3 = 0, beta1 = the difference in Y when X1 changes with consideration for the other variables in the model, beta2 = the difference in Y  when X2 changes with consideration for the other variables, beta3 = the change in Y when X3 changes with consideration for other variables, episiloni = the noise. X1 = AFQT, X2 = Educ, X3 = Gender. 
+
+1.5
+```{r}
+lm.out <- lm(log(Income2005) ~ AFQT + Educ + Gender, data = ex0923)
+summary(lm.out)
+tidy(lm.out, conf.int = T)
+exp(coef(lm.out))
+exp(confint(lm.out))
+```
+beta1 - We estimate that the a youth with 1 unit of change in AFQT tend to have income larger by 1.00% with a CI 1.004% - 1.007%
+
+beta2  - We estimate that youth with 1 year longer of education tend to have income larger by 1.07% with a CI 1.06% - 1.10%. 
+
+beta3 - We estimate that youth with who are male tend to have income larger by 1.87% with a CI 1.74% - 2.00%.
+
+1.6
+```{r}
+fitted <- fitted(lm.out)
+resid <- resid(lm.out)
+qplot(fitted, resid, data = ex0923) + geom_hline(yintercept = 0, color = 'yellow')
+ qplot(sample= resid, geom = "qq") + geom_qq_line()
+
+```
+Most points seem to fit well with this model but as the fitted value increase, the residuals move further below the line.The qqplot skews butwith a large n, that's ok. 
+
+1.7
+log(Yi) = 6193.23 + 1.01X1i + 1.08X2i + 1.87X3i + epsiloni
+
+1.8
+
+```{r}
+exp(coef(lm.out))
+exp(confint(lm.out))
+```
+The difference in income with respect to gender shows a significant increase that is not seen in the other factors. This is an oberservational study so causal relationship can not be established but there does appear to be a relationship between gender and income. 
+
+1.9
+```{r}
+new <- data.frame(AFQT = 75, Educ = 16, Gender = "female")
+exp(predict(lm.out, newdata = new, interval = "confidence"))
+
+```
+We predict that a female with an AFQT score of 75 and 16 years of education will have an income of 33,056.29 with a confidence interval of 31,254.51 - 34,961.93. 
+
+```{r}
+birth_smokers <- read.csv("birthsmokers.csv")
+head(birth_smokers)
+```
+
+```{r}
+class(birth_smokers$Weight) 
+class(birth_smokers$Gestation)
+class(birth_smokers$Smoker) #boolean, needs to be factor
+```
+
+```{r}
+birth_smokers$Smoker <- as.factor(birth_smokers$Smoker)
+class(birth_smokers$Smoker)
+```
+2
+```{r, message = F}
+ggpairs(birth_smokers, columns = 1:3) 
+qplot(Gestation, Weight, color = Smoker, data = birth_smokers) + geom_smooth(color = "blue", se = FALSE)
+qplot(Smoker,Weight, data = birth_smokers, geom = "boxplot") 
+```
+The data appear normally distubuted, the variance seems constant, there appears to be a linear relationship between weight and gestation. 
+
+3. 
+
+Yi = beta0 + beta1Xi + epsiloni, where Yi = weight, beta0 = the intercept of Y, beta0 is also the value of Y when X = 0, beta1 = the difference in Y when X changes, X = Smoker, &  episoloni = noise
+
+
+Yi = beta0 + beta1Xi + epsiloni , where Y = weight, beta0 = the intercept of Y, beta0 is the value of Y when X = 0, beta1 = the difference in weight when gestation, X = Gestation, & episoloni = noise
+
+
+4.
+```{r}
+t.test(birth_smokers$Weight[birth_smokers$Smoker == 0], birth_smokers$Weight[birth_smokers$Smoker == 1])
+a.out <- aov(Weight ~ Smoker, data = birth_smokers) 
+anova(a.out)
+lm.out2 <- lm(Weight ~Smoker, data = birth_smokers) 
+summary(lm.out2)
+```
+The reason the results of the anaylses are the same is because ANOVA is the equivalent of running multiple t-test. And linear models and ANOVA will be equivalent when the models are testing the same hypotheses and when the parameterization of the factors is equivalent.
+
+2. 5. ******
+```{r}
+fitted2 <- fitted(lm.out2)
+resid2 <- resid(lm.out2)
+qplot(fitted2, resid2, data = birth_smokers) + geom_hline(yintercept = 0, color = 'yellow')
+ qplot(sample= resid2, geom = "qq") + geom_qq_line()
+```
+
+
+2.5 cont. 
+
+```{r}
+lm.out3 <- lm(Weight ~Gestation, data = birth_smokers) 
+summary(lm.out3)
+fitted3 <- fitted(lm.out3)
+resid3 <- resid(lm.out3)
+qplot(fitted3, resid3, data = birth_smokers) + geom_hline(yintercept = 0, color = 'yellow')
+ qplot(sample= resid3, geom = "qq") + geom_qq_line()
+```
+With a pvalue of 0.0003, we will reject the null hyoptesis that beta1 = 0. 
+The residuals look normal about zero and variance looks constant. The data seem to be a littlenormally distirbuted but we have a large enough sample size. I recommend conducting a linear regression of the data as it meets the assumptions. 
+
+2.6 
+
+Yi = beta0 + beta1X1i + beta2X2i + epsiloni, where Yi = weight, X1 = Gestation, X2 = Smoker, beta0 = intecept of Y, or value of Y when X1 & X2 = 0. beta1 = the difference in Y when X1 changes with consideration for the other variables in the model, beta2 = the difference in Y  when X2 changes with consideration for the other variables, beta3 = the change in Y when X3 changes with consideration for other variables, episiloni = the noise. 
+
+2.7 
+
+```{r}
+lm.out4 <- lm(Weight ~Gestation + Smoker, data = birth_smokers) 
+summary(lm.out4)
+coef(lm.out4)
+```
+
+2.7 cont. 
+```{r}
+fitted4 <- fitted(lm.out4)
+resid4 <- resid(lm.out4)
+qplot(fitted4, resid4, data = birth_smokers) + geom_hline(yintercept = 0, color = 'yellow')
+ qplot(sample= resid4, geom = "qq") + geom_qq_line()
+```
+The variance looks conastant the data has an ok distirbution, we have a large enough sample size. 
+
+
+2.9 
+
+```{r}
+ qplot(x= Gestation, y= Weight, color = Smoker, data = birth_smokers) + 
+  geom_smooth(method = "lm", se = FALSE)
+```
+2.10 
+
+```{r}
+tidy(lm.out4, conf.int=TRUE)
+confint(lm.out4)
+```
+
+Yi = -2389.57 + 143.1X1i - 244.54X2i + epsiloni
+
+With a pvalue of 2.576964e-06, we should reject the null hypothesis. There is strong evidence that the smoking status does not affect birth weight. It is estimated the smoker status relates to a 244 unit dip in weight with a confidence interval between -330.40  - -158.68
+
+With a pvalue of 1.070123e-15, we should reject the null hypothesis. There is strong evidence that the gestation lenght does not affect birth weight. It is estimated the smoker status relates to 143.10 unit bump in weight with a confidence interval between 124.43  - 161.77. 

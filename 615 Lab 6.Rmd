@@ -1,0 +1,99 @@
+---
+title: "615 Lab 6"
+author: "C'Asha Faltz"
+date: "2/18/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library("car")
+library(MASS)
+attach(mtcars)
+head(mtcars)
+```
+
+```{r}
+reg <- lm(mpg ~ wt)
+plot(wt, mpg)
+abline(reg)
+```
+
+```{r}
+par(mfrow = c(2,2))
+plot(reg)
+# 1st plot -- Not linear
+# 2nd plot -- Not normal
+# 3rd plot -- scale location indicates spread of points across predicted vales (on X axis). A straight line would indicate uniform variance. Homoscedacstiicty 
+# 4th Points with extreme predictor values are high leverage points or have hige leverage values. Measures the influence of an observation. Cook's distance 
+```
+
+```{r}
+#look for outliers
+t <- rstudent(reg)
+par(mfrow = c(1,1))
+plot(t) #looking for non-linear trends. residuals/E{sd}. Index = n 
+summary(t) #we want to look at values greater than 2
+t[abs(t) > 2] #how do we choose the threshold? It's the number between Q3 and max to see which values are high. These values are possible outlier* (may choose any number b/w Q3 and Max)
+
+n <- length(wt)
+qt(0.025/n, n -2 ) #use to decide if the previous values are outliers. df = n - p - 1. Weight is the only predictor so our p = 1. therefore, df = n - 1 - 1. 
+t[abs(t) > abs(qt(0.025/n, n-2))] #there are no outliers
+```
+```{r}
+shapiro.test(t) # the data are not normally distrubuted. Pvalue 0.037 is <= our alpha = 0.05. Testing normality
+```
+
+```{r}
+ncvTest(reg) # if p <= alpha, homoscedasticity is rejected and heteroscedasticity is assumed. 
+#residuals are homoscedasticity
+```
+
+```{r}
+outlierTest(reg) #also an outlier test
+```
+
+```{r}
+attach(ToothGrowth)
+names(ToothGrowth)
+table(dose) # first row is values for the variable, the second we see the frequency
+```
+
+```{r}
+reduced <- lm(len ~ dose) #assumes linearity
+full <- lm(len ~ as.factor(dose)) #does not assume linearity. Uses group means to predic Y for X. Use this syntax when I have one variable. 
+
+plot(dose, len)
+abline(reduced, col = "red", lwd = 4)
+points(dose, predict(full), col = "blue", lwd = 10) #predicited values on the full model. Not on line, becuase lnearity is not assumed. 
+
+anova(full, reduced) # first row for full model, seconf row for reduced model . When p value is small the relation for X and Y is non linear, so we go with full model when p is small. 
+
+#Use pvalue in instances when there is no obvious threshold. Otherise you can look at the difference between the RSS of reduced and full for significnace. 
+```
+
+```{r}
+reg <- lm( mpg ~ wt ) 
+t <- rstudent(reg)
+shapiro.test(t)
+#The data are not normally distrubuted. Pvalue 0.037 is <= our alpha = 0.05. Testing normality
+```
+
+```{r}
+boxcox(reg) #high point lamda b/w -1 and 0, we use this interval for our sequence  
+```
+
+```{r}
+boxcox(reg, lambda = seq(-1, 0, 0.01)) #-.2 is of interest 
+```
+
+```{r}
+Z <- mpg^(-0.2)
+newreg <- lm(Z ~ wt) 
+t <- rstudent(newreg) 
+shapiro.test(t)
+#Pvalue 0.257 <= 0.05, this test passes normality. 
+```
