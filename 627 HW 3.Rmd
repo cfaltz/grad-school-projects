@@ -1,0 +1,189 @@
+---
+title: "627 HW 3"
+author: "C'Asha Faltz"
+date: "9/16/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, message = F}
+load("/Users/cashafaltztest/Downloads/Auto.rda")
+attach(Auto)
+```
+
+```{r}
+head(Auto)
+```
+```{r}
+pairs(Auto)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+new_Auto <- Auto %>% dplyr::select(-name) 
+cor(new_Auto)
+```
+
+```{r}
+reg <- lm(mpg ~ ., new_Auto)
+summary(reg)
+```
+i. With a pvalue < 2.2e-16 less than alpha = 0.05, we see our predictors have a significant relationship with the reponse. 81.8% of variation can be explained used this model. 
+ii. There is a significant relationship between mpg and: displacement, weight, year, and origin.
+iii. When all other predictors remain constant, the the mpg is expected to go up by 0.750 for a one unit increase in year.  
+
+```{r}
+par(mfrow=c(2,2))
+plot(reg)
+```
+The residual v fitted plot shows increasing variation. The data do not appear linear, they are not normally distibuted about the mean. There appears to be a slight curve and a funneling effect. 
+The QQ plot has a right skew on the upper tail. 
+The scale location shows an increase in variance as we go from 0 to 35. 
+The residual v leverage plot shows an influential observation at #14. 
+
+```{r}
+mod1 <- lm(mpg ~ .:weight, data = new_Auto)
+summary(mod1)
+```
+The following interactions are significant:
+displacement and weight
+weight and acceleration
+weight and year
+weight and origin
+```{r}
+mod2 <- lm(mpg ~ origin + year:horsepower, data = new_Auto)
+summary(mod2)
+```
+The interaction between the year and horsepower is significant.
+
+```{r}
+mod3 <- lm(mpg ~ origin:horsepower + cylinders*year, data = new_Auto)
+summary(mod3)
+```
+The interaction between cylinder and year is significant. 
+
+```{r}
+mod4 <- lm(mpg ~ log(origin):horsepower + cylinders*year, data = new_Auto)
+summary(mod4)
+```
+The interaction between origin and horsepower was not significant, however the interaction between log(origin) and horsepower is significant. 
+
+```{r}
+mod5 <- lm(mpg ~ .:sqrt(weight), data = new_Auto)
+summary(mod5)
+```
+Taking the square root of weight in mod1: 
+we have a new significant interaction between cylinders and sqrt(weight), cylinders and weight was not significant. 
+Also, accelreation and sqrt(weight) interaction is not significant whereas acceleration and weight was significant. 
+
+
+
+```{r, message = F}
+load("/Users/cashafaltztest/Downloads/Data textbook (8)(1)/Carseats.rda")
+attach(Carseats)
+```
+
+
+```{r}
+head(Carseats)
+```
+
+```{r}
+reg.full <- lm(Sales ~ Price + Urban + US)
+summary(reg)
+```
+Sales = 13.04 - 0.054(Price) - 0.022(UrbanYes) + 1.2(USYes)
+
+Sales = 13.04 - 0.054(Price) - 0.022(1) + 1.2(USYes) 
+      = 13.018 - 0.054(Price) + 1.2(USYes) ##Urban = Yes
+      
+      
+Sales = 13.04 - 0.054(Price) - 0.022(UrbanYes) + 1.2(1)
+      = 14.24 - 0.054(Price) - 0.022(UrbanYes) ##US = Yes
+   
+   
+The null hypothesis Ho: Bj = 0 is not rejected for the UrbanYes variable. This means there isnt a significant relationship between the Urban variable and the Sales response. 
+
+
+```{r}
+reg.red <- lm(Sales ~ Price + US)
+anova(reg.red, reg.full)
+```
+The p value > alpha = 0.05 in the partial F test, we see we do not have evidence to suggest the full model is better. That is, it is not necessary to include Urban in our model. 
+
+```{r}
+summary(reg.full)
+```
+The tstat for Urban is -0.081
+```{r}
+2*pt(-0.081, 396, lower.tail= T)
+(-0.081)^2
+```
+From out t test we see that our p value 0.936 > alpha = 0.05. That means there is no significat relationship between the variable and the response. The square of out tstat is equal to our Fstat. 
+
+```{r}
+reg3 <- lm(Sales ~ Price + US)
+par(mfrow=c(2,2))
+plot(reg3)
+```
+
+The residual v fitted plot has a high density of points close to the origin. The res v fitted plot also has equal variance about the origin. The data appear normally distributed and random. 
+
+The scale location is mostly horizontal and has a good spread about the red line. This suggests there is constant variances in the residuals errors or 
+homoscedasticity. 
+
+The QQ plot is largely on the line, this suggests the data are normally distributed. 
+
+The residual vs leverage plot shows no evidence of leverage points. 
+```{r}
+library(car)
+USyes = 1*(US == "Yes")
+mod <- lm(Sales ~ Price + USyes)
+vif(mod)
+```
+Both of my independent variables have vif results that are close to 1, so we do not have an issue with multicollinearity.  
+
+```{r}
+library(MASS)
+```
+
+```{r}
+t <- rstudent(reg3)
+plot(t)
+```
+
+```{r}
+t[abs(t) > 2.5]
+```
+
+```{r}
+qt(0.05/2/400, 396)
+t[ abs(t) > abs(qt( 0.05/400/2, 396 )) ]
+```
+We see that we do not have any outliers. 
+
+```{r}
+shapiro.test(t)
+```
+Ho for the shapiro test is that the data are normally distributed. We have a p-value > alpha 0.05 so we fail to reject the null hypothesis. 
+
+```{r}
+ncvTest(reg3)
+```
+
+Ho for the ncvtest is that the residuals are constant. With a high p value 0.21 > aplha 0.05, we fail to reject the null hyopthesis and infer HOMOSCEDASTICITY is present. 
+
+
+```{r}
+Price_cat = as.factor( floor(Price/20) )
+reg.full <- lm(Sales ~ Price_cat + Urban + US)
+reg.red <- lm(Sales ~ Price + Urban + US)
+anova(reg.red, reg.full)
+```
+
+Our pvalue is 0.856 > 0.05 which means we do not have enough evidence to say our full model is better than the reduced model. 
+

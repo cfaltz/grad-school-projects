@@ -1,0 +1,79 @@
+---
+title: "627 Lab 7"
+author: "C'Asha Faltz"
+date: "9/14/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+getwd()
+```
+```{r}
+setwd("/Users/cashafaltztest/Documents") 
+Depr <- read.csv("depression_data.csv")
+names(Depr)
+```
+```{r}
+attach(Depr)
+fix(Data)
+summary(Diagnosis)
+```
+```{r}
+Depr1=na.omit(Depr) 
+attach(Depr1); dim(Depr1)
+```
+
+```{r}
+fit <- glm(Diagnosis~Gender+Guardian_status+Cohesion_score,family=binomial) 
+summary(fit)
+```
+All three variables have a pvalue < alpha 0.05, therfore they are all significant. 
+
+```{r}
+Prob=fitted.values(fit)
+summary(Prob)
+```
+
+```{r}
+YesPredict=1*(Prob > 0.3)
+table(Diagnosis, YesPredict)
+```
+From the table we observe 27 false positives and 48 false negatives. 
+We correctly predicted (359 + 24)/458 which is 83.6 percent, subtracting this number from 100% we get our training error rate which is 16.4%. 
+For all the students with depression, we correctly predict 24 / (48 + 24) = 1/3. These are not perfect results since we go false negatives and false postives. 
+
+```{r, message = f}
+n=length(ID) 
+Z=sample(n,n/2) 
+Depr.training=Depr1[Z,] 
+Depr.testing=Depr1[-Z,]
+
+
+fit=glm(Diagnosis~Gender+Guardian_status+Cohesion_score,family=binomial, data=Depr.training)
+
+Prob=predict(fit, data.frame(Depr.testing), type="response") 
+YesPredict=1*(Prob > 0.3)
+attach(Depr.testing) 
+table(Diagnosis,YesPredict)
+```
+(175 + 12)/ 229 means we have correctly predicted 81.7%. This is slightly less than our previous prediction. 
+12 / (24 + 12) = 1/3 of the students with depression were correctly diagnosed. 
+The correct prediction rate are roughly the same for both the testing and training data. This suggest our predictions may be insufficeint for correct depression diagnosis. 
+
+
+```{r}
+predict(fit, data.frame(Gender="Female", Guardian_status=1, Cohesion_score=26))
+```
+This prediction does not represent the probability. To find the probability I must convert to the logistic function. 
+
+```{r}
+predict(fit, data.frame(Gender="Female", Guardian_status=1, Cohesion_score=26), type = 'response')
+```
+```{r}
+predict(fit, data.frame(Gender="Female", Guardian_status=1, Cohesion_score=52), type = 'response')
+```
+
+
