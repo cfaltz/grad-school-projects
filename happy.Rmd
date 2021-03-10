@@ -1,1 +1,179 @@
+---
+title: "Final Project"
+author: "C'Asha Faltz"
+date: "4/22/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE,
+	comment = NULL
+)
+```
+
+```{r include=FALSE}
+library(purrr)
+library(tidyverse)
+library(modelr)
+library(countrycode)
+library(gganimate)
+library(gifski)
+library(broom)
+library(plotly)
+```
+
+```{r}
+files <- dir("./happiness", pattern = "\\.csv$", full.names = TRUE)
+happy_tbl <- map(files, read.csv)
+
+```
+
+```{r}
+library(dplyr)
+Y15 <- happy_tbl[[1]]
+Y16 <- happy_tbl[[2]]
+Y17 <- happy_tbl[[3]]
+Y18 <- happy_tbl[[4]]
+Y19 <- happy_tbl[[5]]
+
+#Removed NA UAE Trust Value, Will add back after merge
+Y18 <- Y18 %>% filter(Country.or.region != "United Arab Emirates")
+Y18 <- Y18 %>% mutate(Perceptions.of.corruption = as.numeric(as.character(Perceptions.of.corruption)))
+```
+
+```{r function}
+#functions for Y15 - Y17
+create_data_frame <- function(dataset, YEAR){
+  dataset <- dataset %>% 
+  dplyr::select(Country, Happiness.Rank, Happiness.Score, Economy..GDP.per.Capita., Family, Health..Life.Expectancy., Freedom,
+                Trust..Government.Corruption., Generosity)
+  colnames(dataset) <- c("Country", "Happiness_Rank", "Happiness_Score",  "Economy", "Support", "Health", "Freedom", "Trust", "Generosity")
+  dataset <- dataset %>% mutate(Year = YEAR) %>%  
+    dplyr::select(Happiness_Rank, Year, Country, everything()) 
+  return(dataset)
+}
+#functions for Y18 - Y19
+create_data_frame_2 <- function(dataset, YEAR){
+  dataset <- dataset %>% 
+  dplyr::select(-Score) %>% dplyr::select(2,1,3:6,8,7)
+  colnames(dataset) <- c("Country", "Happiness_Rank", "Economy", "Support", "Health", "Freedom", "Trust", "Generosity")
+  dataset <- dataset %>% mutate(Year = YEAR) %>%  
+    dplyr::select(Happiness_Rank, Year, Country, everything()) 
+  return(dataset)
+}
+```
+
+```{r Clean Data Frames}
+Year_2015 <- create_data_frame(dataset = Y15, YEAR = 2015)
+head(Year_2015)
+
+Year_2016 <- create_data_frame(dataset = Y16, YEAR = 2016)
+head(Year_2016)
+
+Year_2017 <- create_data_frame(dataset = Y17, YEAR = 2017)
+head(Year_2017)
+
+Year_2018 <- create_data_frame_2(dataset = Y18, YEAR = 2018)
+head(Year_2018)
+
+Year_2019 <- create_data_frame_2(dataset = Y19, YEAR = 2019)
+head(Year_2019)
+```
+
+
+```{r }
+Year2015_2019 <- bind_rows(Year_2015, Year_2016, Year_2017, Year_2018, Year_2019)
+Year2015_2019 <- Year2015_2019 %>% arrange(Country)
+#fixed missing Trust value for UAE in 2018 by using the mean of other years
+
+UAE_Trust_18 <- Year2015_2019 %>% filter(Country == "United Arab Emirates") %>% summarise(Trust = mean(Trust))
+
+UAE <- data.frame("Happiness_Rank" = 20, "Year" = 2018, "Country" = "United Arab Emirates", "Economy" = 	6.774, "Support" = 2.096, 
+"Health" = 0.776, "Freedom" = 0.284, "Trust" = UAE_Trust_18, "Generosity" = 0.186)
+
+#attached UAE18
+Year2015_2019 <- bind_rows(Year2015_2019, UAE)
+Year2015_2019 <- Year2015_2019 %>% group_by(Country) %>%  arrange(Year)
+
+Year2015_2019$Continent <- countrycode(sourcevar = Year2015_2019$Country,
+                                     origin = "country.name",
+                                   destination = "continent")
+```
+
+
+```{r, fig.width= 20}
+head(Year2015_2019)
+```
+
+
+
+```{r}
+happiness <- Year2015_2019
+```
+
+```{r}
+
+na_continent <- happiness[is.na(happiness$Continent),]
+unique(na_continent$Country)
+```
+
+```{r}
+happiness %>%
+  mutate(Continent = ifelse(grepl("Kosovo", Country), "Europe", Continent)) -> happiness
+```
+
+```{r}
+happiness.fit <- glm(Happiness_Rank ~ Economy+Support+Health+Freedom+Trust+Generosity, data = happiness, family = "poisson")
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(happiness.fit)
+```
+
+```{r}
+summary(happiness.fit)
+``` 
+
+```{r}
+by_country_year <- happiness %>% 
+  group_by(Country, Continent, Year) %>% 
+  nest()
+head(by_country_year)
+
+h_all_model <- function(df) {
+  glm(Happiness_Rank ~ Economy+Support+Health+Freedom+Trust+Generosity, data = df, family = "poisson")
+}
+
+models <- map(by_country_year$data, h_all_model)
+
+by_country_year <- by_country_year %>% 
+  mutate(model = map(data, h_all_model))
+
+by_country_year <- by_country_year %>% 
+  mutate(resids = map2(data, model, add_residuals))
+
+resids <- unnest(by_country_year, resids)
+head(resids) 
+```
+
+```{r}
+resids %>% 
+  ggplot(aes(Year, resid, group = Country, color = Continent)) +
+    geom_line(alpha = 1 / 3) + 
+    facet_wrap(~Continent)
+```
+
+```{r}
+step(happiness.fit, direction = "backward")$coefficients
+```
+
+
+```{r}
+sessionInfo()
+```
+
 
